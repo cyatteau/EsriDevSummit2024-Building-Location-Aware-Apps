@@ -1,0 +1,741 @@
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="initial-scale=1,maximum-scale=1,user-scalable=no"
+    />
+    <title>Real Estate Demo - JS SDK</title>
+
+    <style>
+      @media (max-width: 600px) {
+        .top-bar {
+          flex-direction: column;
+          align-items: stretch;
+        }
+
+        .container {
+          top: 10px;
+          left: 0;
+          width: 100%;
+          height: auto; /* Adjust height for mobile */
+          padding-bottom: 20px; /* Add some padding at the bottom */
+        }
+
+        .overlay {
+          top: 5%;
+          left: 5%;
+          right: 5%;
+          bottom: 5%;
+          overflow: scroll; /* Ensure content is scrollable on small screens */
+        }
+
+        .logo {
+          width: 50px; /* Adjust logo size for small screens */
+          top: 5px;
+          position: absolute;
+          z-index: 100;
+          left: 10px;
+        }
+
+        .overlay-content p,
+        .overlay-content h2 {
+          font-size: smaller; /* Adjust text size for readability on small screens */
+        }
+      }
+      body {
+        margin: 0;
+        padding: 0;
+        background-color: #f0f0f0; /* Light gray background */
+        /* Polka dot pattern */
+        background-image: radial-gradient(circle, #d0d0d0 1px, transparent 1px),
+          radial-gradient(circle, #d0d0d0 1px, transparent 1px);
+        background-size: 20px 20px;
+        background-position: 0 0, 10px 10px;
+        font-family: 'Raleway', 'Montserrat', 'Avenir Next', 'Helvetica Neue',
+          sans-serif;
+        font-size: 15px;
+      }
+
+      html,
+      body,
+      #viewDiv {
+        padding: 0;
+        margin: 0;
+        height: 100%;
+        width: 100%;
+      }
+
+      .container {
+        position: absolute;
+        top: 80px;
+        left: 2%;
+        height: 86%;
+        width: 96%;
+        border: 1px solid #ccc; /* Optional: adds a border around the map */
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        z-index: 50;
+        background-color: #fff;
+      }
+      calcite-shell-panel {
+        height: 100%;
+        box-shadow: 2px 1px 2px rgba(0, 0, 0, 0.15);
+      }
+      calcite-block:hover {
+        background-color: #e9e9e9;
+        transition: background-color 0.3s;
+        cursor: pointer;
+      }
+      .overlay {
+        position: absolute;
+        top: 1%;
+        bottom: 3%;
+        left: 10%; /* Adjust for less width */
+        right: 10%; /* Adjust for less width */
+        background-color: white;
+        padding: 20px;
+        border: 1px solid #ccc;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+        z-index: 2000;
+        display: flex;
+        flex-direction: column;
+        align-items: center; /* Center align the child elements */
+        overflow: auto;
+        border-radius: 8px; /* Optional: adds rounded corners to the overlay */
+      }
+
+      .overlay-content h2,
+      .overlay-content p {
+        text-align: center; /* Center-align the text */
+        width: 100%; /* Ensure text alignment takes full width */
+      }
+
+      .overlay-content p {
+        font-size: 1.1rem; /* Increase the text size for better readability */
+        margin-top: 10px; /* Adjust spacing to your preference */
+      }
+
+      .close-btn {
+        cursor: pointer;
+        position: absolute;
+        top: 10px;
+        right: 20px;
+        font-size: 20px;
+      }
+
+      .top-bar {
+        display: flex;
+        padding: 1px;
+      }
+      .logo {
+        width: 3.75%;
+        position: absolute;
+        top: 2;
+        left: 8;
+      }
+      calcite-navigation-logo {
+        margin-left: 10px;
+      }
+      .calcite-bar-item {
+        margin: 5px 10px;
+      }
+    </style>
+
+    <link
+      rel="stylesheet"
+      href="https://js.arcgis.com/4.29/esri/themes/light/main.css"
+    />
+    <script src="https://js.arcgis.com/4.29/"></script>
+    <!-- Calcite imports -->
+    <script
+      type="module"
+      src="https://js.arcgis.com/calcite-components/2.4.0/calcite.esm.js"
+    ></script>
+    <link
+      rel="stylesheet"
+      type="text/css"
+      href="https://js.arcgis.com/calcite-components/2.4.0/calcite.css"
+    />
+  </head>
+
+  <body>
+    <img src="./SkylineRealty.png" class="logo" />
+    <calcite-navigation slot="header" id="nav">
+      <calcite-navigation-logo
+        href=""
+        icon="locator"
+        alt="Application logo"
+        slot="logo"
+        heading="Skyline Realty"
+        description="A Fake Real Estate Company"
+      ></calcite-navigation-logo>
+      <calcite-menu slot="content-end" label="Plant Types">
+        <calcite-menu-item
+          active
+          text="Find a Property"
+          text-enabled
+        ></calcite-menu-item>
+        <calcite-menu-item
+          text="Find an Advisor"
+          text-enabled
+        ></calcite-menu-item>
+        <calcite-menu-item text="Contact Us" text-enabled></calcite-menu-item>
+      </calcite-menu>
+    </calcite-navigation>
+    <calcite-shell class="container">
+      <calcite-navigation slot="header" id="nav"> </calcite-navigation>
+      <calcite-shell-panel slot="panel-start" id="shellPanel">
+      </calcite-shell-panel>
+      <div class="top-bar">
+        <calcite-button
+          id="changeBasemapButton"
+          icon-start="layer-basemap"
+          label="Change Basemap"
+          appearance="outline"
+          kind="neutral"
+          class="calcite-bar-item"
+        >
+          Change Basemap
+        </calcite-button>
+        <div style="display: flex">
+          <div style="margin: 16px 4px 0 9px"># of Baths</div>
+          <calcite-select id="bathroomFilter" style="margin: 9px 0 0 0">
+            <calcite-option value="">Any</calcite-option>
+            <calcite-option value="1">1</calcite-option>
+            <calcite-option value="2">2</calcite-option>
+            <calcite-option value="3">3</calcite-option>
+            <calcite-option value="4">4+</calcite-option>
+          </calcite-select>
+        </div>
+        <div style="display: flex">
+          <div style="margin: 16px 4px 0 9px"># of Beds</div>
+          <calcite-select id="bedroomFilter" style="margin: 9px 0 0 0">
+            <calcite-option value="">Any</calcite-option>
+            <calcite-option value="1">1</calcite-option>
+            <calcite-option value="2">2</calcite-option>
+            <calcite-option value="3">3</calcite-option>
+            <calcite-option value="4">4+</calcite-option>
+          </calcite-select>
+        </div>
+        <div style="display: flex; align-items: center; margin: -1px 4px">
+          <calcite-select
+            id="sortPriceSelect"
+            scale="m"
+            width="full"
+            style="padding: 10px"
+          >
+            <calcite-option value="default">Default Price Order</calcite-option>
+            <calcite-option value="ascending"
+              >Price: Low to High</calcite-option
+            >
+            <calcite-option value="descending"
+              >Price: High to Low</calcite-option
+            >
+          </calcite-select>
+        </div>
+      </div>
+      <div id="viewDiv"></div>
+    </calcite-shell>
+    <script>
+      require([
+        'esri/config',
+        'esri/Map',
+        'esri/layers/FeatureLayer',
+        'esri/views/MapView',
+        'esri/Graphic',
+        'esri/rest/route',
+        'esri/rest/support/RouteParameters',
+        'esri/widgets/Sketch',
+        'esri/layers/GraphicsLayer',
+        'esri/Basemap',
+        'esri/layers/VectorTileLayer'
+      ], function (
+        esriConfig,
+        Map,
+        FeatureLayer,
+        MapView,
+        Graphic,
+        route,
+        RouteParameters,
+        Sketch,
+        GraphicsLayer,
+        Basemap,
+        VectorTileLayer
+      ) {
+        esriConfig.apiKey =
+          'YOUR_KEY'
+
+        const alternativeBasemap = new Basemap({
+          baseLayers: [
+            new VectorTileLayer({
+              portalItem: {
+                id: '0e10fb691ed346eca8badc460358a74e' // ID of your alternative basemap
+              }
+            })
+          ]
+        })
+
+        const defaultBasemap = 'arcgis-community' // Identifier for the default basemap
+        const order = true
+        let isDefaultBasemap = true // Flag to track the current basemap
+
+        document
+          .getElementById('changeBasemapButton')
+          .addEventListener('click', function () {
+            if (isDefaultBasemap) {
+              map.basemap = alternativeBasemap // Switch to the alternative basemap
+            } else {
+              map.basemap = defaultBasemap // Switch back to the default basemap
+            }
+            isDefaultBasemap = !isDefaultBasemap // Toggle the flag
+            view.center = view.center // Refresh the view
+          })
+
+        const theBasemap = 'arcgis/community'
+
+        const map = new Map({
+          basemap: theBasemap //arcgis/satellite then basemap
+        })
+
+        const view = new MapView({
+          container: 'viewDiv',
+          center: [-116.53796, 33.82221],
+          zoom: 14,
+          map: map
+        })
+
+        const condosRenderer = {
+          type: 'simple',
+          symbol: {
+            type: 'picture-marker',
+            url: 'https://static-00.iconduck.com/assets.00/map-pointer-house-icon-1415x2048-h4s20jgl.png',
+            width: '26px',
+            height: '42px'
+          }
+        }
+
+        const condosLabels = {
+          symbol: {
+            type: 'text',
+            color: '#FFFFFF',
+            haloColor: '#5E8D74',
+            haloSize: '2px',
+            font: {
+              size: '12px',
+              family: 'Noto Sans',
+              style: 'italic',
+              weight: 'normal'
+            }
+          },
+
+          labelPlacement: 'above-center',
+          labelExpressionInfo: {
+            expression: '$feature.Address'
+          }
+        }
+
+        const popupCondos = {
+          title: '${Cost}',
+          content:
+            "<div style='display: flex;'><span><div style='font-weight:700;'>{Address}</div><br/><span>Bed: {Number_of_Bedrooms} | Bath: {Number_of_Bathrooms}</span><br/><span>Square Feet: {Square_Feet}</span><br/></span><img src={Image} style='max-width:100px;'/></div>"
+        }
+
+        const condosLayer = new FeatureLayer({
+          url: 'https://services3.arcgis.com/GVgbJbqm8hXASVYi/arcgis/rest/services/fakerealestatepalmsprings/FeatureServer/0',
+          renderer: condosRenderer,
+          labeleingInfo: [condosLabels],
+          outFields: [
+            'Address',
+            'Latitude',
+            'Longitude',
+            'Cost',
+            'Number_of_Bedrooms',
+            'Number_of_Bathrooms',
+            'Square_Feet',
+            'Image',
+            'Unit_Type',
+            'Year_Built',
+            'Number_of_Stories',
+            'Price_Per_Square_Foot',
+            'HOA_Fees_Per_Month',
+            'ObjectId'
+          ],
+          popupTemplate: popupCondos
+        })
+        map.add(condosLayer)
+
+        view.when(() => {
+          // Once the view is loaded, query the feature layer
+          queryFeatureLayer()
+        })
+
+        document
+          .getElementById('bathroomFilter')
+          .addEventListener('calciteSelectChange', function () {
+            const bathroomSelectedValue = this.value
+            const bedroomSelectedValue =
+              document.getElementById('bedroomFilter').value
+            queryFeatureLayer(bathroomSelectedValue, bedroomSelectedValue)
+            resetFeatureLayerView(bathroomSelectedValue, bedroomSelectedValue)
+            updateDisplayedProperties()
+          })
+
+        document
+          .getElementById('bedroomFilter')
+          .addEventListener('calciteSelectChange', function () {
+            const bathroomSelectedValue =
+              document.getElementById('bathroomFilter').value
+            const bedroomSelectedValue = this.value
+            queryFeatureLayer(bathroomSelectedValue, bedroomSelectedValue)
+            resetFeatureLayerViewBeds(
+              bathroomSelectedValue,
+              bedroomSelectedValue
+            )
+            updateDisplayedProperties()
+          })
+
+        function queryFeatureLayer(numberOfBathrooms, numberOfBedrooms) {
+          let whereClause = '1=1' // Default to show all
+
+          if (numberOfBathrooms) {
+            whereClause += ` AND Number_of_Bathrooms >= ${numberOfBathrooms}`
+          }
+
+          if (numberOfBedrooms) {
+            if (numberOfBedrooms.includes('+')) {
+              const beds = numberOfBedrooms.replace('+', '') // Remove '+' for comparison
+              whereClause += ` AND Number_of_Bedrooms >= ${beds}`
+            } else {
+              whereClause += ` AND Number_of_Bedrooms = ${numberOfBedrooms}`
+            }
+          }
+
+          const query = condosLayer.createQuery()
+          query.where = whereClause
+          query.returnGeometry = true
+          query.outFields = [
+            'Address',
+            'Latitude',
+            'Longitude',
+            'Cost',
+            'Number_of_Bedrooms',
+            'Number_of_Bathrooms',
+            'Square_Feet',
+            'Image',
+            'Unit_Type',
+            'Year_Built',
+            'Number_of_Stories',
+            'Price_Per_Square_Foot',
+            'HOA_Fees_Per_Month',
+            'ObjectId'
+          ]
+
+          condosLayer.queryFeatures(query).then(function (results) {
+            displayResults(results)
+            updateDisplayedProperties()
+          })
+        }
+
+        var sketchLayer = new GraphicsLayer()
+        map.add(sketchLayer)
+
+        // Sketch widget
+        var sketch = new Sketch({
+          layer: sketchLayer,
+          view: view,
+          creationMode: 'update'
+        })
+        view.ui.add(sketch, 'top-right')
+
+        sketch.on('update', event => {
+          // Create
+          if (event.state === 'start') {
+            applySpatialFilter(event.graphics[0].geometry)
+          }
+          if (event.state === 'complete') {
+            fetchAllFeatures()
+          }
+        })
+
+        sketch.on('delete', event => {
+          document.getElementById('bathroomFilter').value = ''
+          document.getElementById('bedroomFilter').value = ''
+          fetchAllFeatures()
+        })
+
+        function sortPropertiesByPrice(order) {
+          const shellPanel = document.getElementById('shellPanel')
+          let blocks = Array.from(shellPanel.querySelectorAll('calcite-block'))
+
+          if (order === 'ascending') {
+            blocks.sort(
+              (a, b) =>
+                parseInt(a.getAttribute('data-cost'), 10) -
+                parseInt(b.getAttribute('data-cost'), 10)
+            )
+          } else if (order === 'descending') {
+            blocks.sort(
+              (a, b) =>
+                parseInt(b.getAttribute('data-cost'), 10) -
+                parseInt(a.getAttribute('data-cost'), 10)
+            )
+          }
+
+          const panel = document.querySelector('calcite-panel')
+          blocks.forEach(block => {
+            panel.appendChild(block) // This moves the blocks without needing to clear them first
+          })
+        }
+
+        function resetFeatureLayerView(results, bedResults) {
+          if (results) {
+            results = results
+          } else {
+            results = 1
+          }
+          if (bedResults) {
+            bedResults = bedResults
+          } else {
+            bedResults = 1
+          }
+          view
+            .whenLayerView(condosLayer)
+            .then(function (layerView) {
+              // Reset the filter to null, showing all features
+              layerView.filter = null
+              condosLayer.definitionExpression = `Number_of_Bathrooms >= ${results}` // Show all features
+            })
+            .catch(function (error) {
+              console.error('Error resetting feature layer view:', error)
+            })
+        }
+
+        function resetFeatureLayerViewBeds(results, bedResults) {
+          if (results) {
+            results = results
+          } else {
+            results = 1
+          }
+          if (bedResults) {
+            bedResults = bedResults
+          } else {
+            bedResults = 1
+          }
+          view
+            .whenLayerView(condosLayer)
+            .then(function (layerView) {
+              // Reset the filter to null, showing all features
+              layerView.filter = null
+              condosLayer.definitionExpression = `Number_of_Bedrooms >= ${bedResults}` // Show all features
+            })
+            .catch(function (error) {
+              console.error('Error resetting feature layer view:', error)
+            })
+        }
+
+        // Call this function after deleting a sketch and fetching all features
+        function fetchAllFeatures() {
+          const query = condosLayer.createQuery()
+          query.where = '1=1'
+          condosLayer
+            .queryFeatures(query)
+            .then(results => {
+              displayResults(results)
+              resetFeatureLayerView()
+              updateDisplayedProperties()
+            })
+            .catch(err => {
+              console.error('Error fetching all features:', err)
+            })
+        }
+
+        function applySpatialFilter(geometry) {
+          const query = condosLayer.createQuery()
+          query.spatialRelationship = 'intersects'
+          query.geometry = geometry
+          query.returnGeometry = true
+          condosLayer.queryFeatures(query).then(results => {
+            displayResults(results)
+          })
+          // Apply the spatial filter to the feature layer view
+          view.whenLayerView(condosLayer).then(function (featureLayerView) {
+            featureLayerView.filter = {
+              geometry: geometry,
+              spatialRelationship: 'intersects'
+            }
+            updateDisplayedProperties()
+          })
+        }
+
+        function displayResults(results) {
+          const shellPanel = document.getElementById('shellPanel')
+          // Clear existing content in the shellPanel
+          while (shellPanel.firstChild) {
+            shellPanel.removeChild(shellPanel.firstChild)
+          }
+
+          const panel = document.createElement('calcite-panel')
+          panel.heading = 'Properties Information 🏠'
+          shellPanel.appendChild(panel)
+
+          results.features.forEach(feature => {
+            const block = document.createElement('calcite-block')
+            block.setAttribute('data-cost', feature.attributes.Cost)
+            block.style.boxShadow = '5px 0px 1px rgba(0, 0, 0, 0.25)'
+            block.open = true
+            block.id = feature.attributes.Address
+            block.tabIndex = 0 // Make the block focusable
+
+            // Simple summary information for calcite-block
+            const summaryDiv = document.createElement('div')
+            summaryDiv.innerHTML = `<div><span style="font-size:16px; color:#6D071A;"><b>${feature.attributes.Address}</b></span><div style="margin-top: 11px;"><div style="font-size:15px;"><b>$${feature.attributes.Cost} USD</b></div></div><div style="margin-top: 5px;"><span>Bedrooms: ${feature.attributes.Number_of_Bedrooms} | </span>
+              <span>Bathrooms: ${feature.attributes.Number_of_Bathrooms}</span></div>
+              <div style="margin-top: 5px;">Square Footage: ${feature.attributes.Square_Feet}</div></div><img src=${feature.attributes.Image} style='max-width: 200px; display: block; margin-top: 9px;'></div>`
+            block.appendChild(summaryDiv)
+            panel.appendChild(block)
+
+            // Event listener for the block to show detailed info in the overlay
+            block.addEventListener('click', function () {
+              let overlay = document.querySelector('.overlay')
+              if (!overlay) {
+                overlay = document.createElement('div')
+                overlay.className = 'overlay'
+                document.body.appendChild(overlay)
+              } else {
+                overlay.style.display = 'block' // Make sure overlay is visible
+              }
+
+              const miniMapContainerId = `mini-map-container`
+
+              // Condensed detailed information for overlay
+              const detailedInfoHTML = `<span class="close-btn">&times;</span><div style="text-align: center; width: 100%;"> <!-- Ensure center alignment -->
+              <img src=${feature.attributes.Image} alt="Property Image" style="max-width: 25%; max-height: 300px; object-fit: cover; margin: 5px 0; border-radius: 8px;" />
+              </div>
+              <div class="overlay-content">
+                      <h2 style="margin-bottom: 0;">${feature.attributes.Address}</h2><br/>
+                      <p style="margin-top: 2px;"><strong>$${feature.attributes.Cost} USD</strong> | <strong>${feature.attributes.Number_of_Bedrooms}</strong> Beds | <strong>${feature.attributes.Number_of_Bathrooms}</strong> Baths | <strong>${feature.attributes.Square_Feet} sqft</strong></p>
+                      <p style="margin-top: 2px;"><strong>Unit Type:</strong> ${feature.attributes.Unit_Type} | <strong>Built:</strong> ${feature.attributes.Year_Built} | <strong>Stories:</strong> ${feature.attributes.Number_of_Stories} | <strong>HOA:</strong> $${feature.attributes.HOA_Fees_Per_Month}/mo</p>
+                  </div>
+                  <div id="miniMapContainer" class="mini-map-container" style="height: 700px; width: 100%; margin-top: 8px;"></div>
+              `
+              overlay.innerHTML = detailedInfoHTML
+              initializeMiniMap(
+                feature.attributes.Address,
+                feature.attributes.Longitude,
+                feature.attributes.Latitude
+              )
+
+              overlay
+                .querySelector('.close-btn')
+                .addEventListener('click', function () {
+                  overlay.style.display = 'none'
+                })
+            })
+
+            document
+              .getElementById('sortPriceSelect')
+              .addEventListener('calciteSelectChange', event => {
+                const selectedValue = event.target.selectedOption.value
+                const shellPanel = document.getElementById('shellPanel')
+                let blocks = shellPanel.querySelectorAll('calcite-block')
+                sortPropertiesByPrice(selectedValue)
+
+                // Sort blocks only if not 'default'
+                if (selectedValue !== 'default') {
+                  blocks = Array.from(blocks).sort((a, b) => {
+                    const costA = parseInt(a.getAttribute('data-cost'), 10)
+                    const costB = parseInt(b.getAttribute('data-cost'), 10)
+                    return selectedValue === 'ascending'
+                      ? costA - costB
+                      : costB - costA
+                  })
+                }
+
+                const panel = document.querySelector('calcite-panel')
+                blocks.forEach(block => {
+                  panel.appendChild(block)
+                })
+              })
+
+            function initializeMiniMap(address, longitude, latitude) {
+              require([
+                'esri/Map',
+                'esri/views/MapView',
+                'esri/widgets/Directions',
+                'esri/layers/RouteLayer',
+                'esri/geometry/Point'
+              ], function (Map, MapView, Directions, RouteLayer, Point) {
+                const miniMapContainer =
+                  document.getElementById('miniMapContainer')
+                const routeLayer = new RouteLayer({
+                  stops: [
+                    { name: address, geometry: { x: longitude, y: latitude } }
+                  ]
+                })
+                if (miniMapContainer) {
+                  const miniMap = new Map({
+                    basemap: 'arcgis/streets',
+                    layers: [routeLayer]
+                  })
+
+                  miniMap.add(routeLayer) // Add route layer to the mini-map
+
+                  const miniMapView = new MapView({
+                    container: miniMapContainer,
+                    map: miniMap,
+                    center: [longitude, latitude],
+                    zoom: 12
+                  })
+
+                  const directionsWidget = new Directions({
+                    layer: routeLayer,
+                    apiKey:
+                      'YOUR_KEY',
+                    view: miniMapView
+                  })
+
+                  miniMapView.ui.add(directionsWidget, {
+                    position: 'top-right'
+                  })
+
+                  directionsReady()
+
+                  async function directionsReady() {
+                    await directionsWidget.when()
+                    directionsWidget.layer.stops.at(0).geometry = new Point({
+                      x: longitude,
+                      y: latitude
+                    })
+                  }
+                }
+              })
+            }
+          })
+        }
+
+        function updateDisplayedProperties() {
+          const selectedOrder = document.getElementById('sortPriceSelect').value
+          sortPropertiesByPrice(selectedOrder)
+        }
+
+        document.addEventListener(
+          'click',
+          function (event) {
+            const overlay = document.querySelector('.overlay')
+            if (!overlay) return // If no overlay, do nothing
+
+            // Check if the click is outside the overlay and not on a calcite-block
+            const isClickInsideOverlay = overlay.contains(event.target)
+            const isClickOnCalciteBlock =
+              event.target.closest('calcite-block') !== null
+
+            if (!isClickInsideOverlay && !isClickOnCalciteBlock) {
+              overlay.style.display = 'none' // Hide the overlay
+            }
+          },
+          true
+        ) // Use capturing to ensure the event is caught as it propagates down
+      })
+    </script>
+  </body>
+</html>
