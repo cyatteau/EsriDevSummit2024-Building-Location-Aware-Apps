@@ -1,0 +1,1109 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Grocery Map View</title>
+    <link
+      href="https://unpkg.com/maplibre-gl@3.2.1/dist/maplibre-gl.css"
+      rel="stylesheet"
+    />
+    <script
+      type="module"
+      src="https://js.arcgis.com/calcite-components/2.6.0/calcite.esm.js"
+    ></script>
+    <link
+      rel="stylesheet"
+      type="text/css"
+      href="https://js.arcgis.com/calcite-components/2.6.0/calcite.css"
+    />
+    <script src="https://unpkg.com/@esri/arcgis-rest-request@4.0.0/dist/bundled/request.umd.js"></script>
+    <script src="https://unpkg.com/@esri/arcgis-rest-geocoding@4.0.0/dist/bundled/geocoding.umd.js"></script>
+    <script src="https://unpkg.com/@esri/arcgis-rest-routing@4.0.0/dist/bundled/routing.umd.js"></script>
+    <script src="https://unpkg.com/maplibre-gl@3.2.1/dist/maplibre-gl.js"></script>
+    <style>
+      html,
+      body {
+        padding: 0;
+        margin: 0;
+        height: 100%;
+        width: 100%;
+        font-family: 'Raleway', 'Montserrat', 'Avenir Next', 'Helvetica Neue',
+          sans-serif;
+        color: #727171;
+        background-color: #f4f4f4; /* Soft background color */
+      }
+
+      .content-container {
+        display: flex;
+        flex-grow: 1; /* Allow content container to fill available space */
+        overflow: hidden; /* Prevents overflow */
+      }
+
+      .content-container,
+      .sidePanel {
+        padding: 1rem; /* Add more padding for spacing */
+      }
+
+      body {
+        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+      }
+
+      .facility-container,
+      .order-address {
+        margin-bottom: 1rem; /* Add bottom margin for separation */
+        background-color: #fff; /* Light background to pop out from the container */
+        border-radius: 8px; /* Rounded corners for a modern look */
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12); /* Subtle shadow for depth */
+        padding: 0.75rem; /* Internal padding for content */
+      }
+
+      #map {
+        flex-grow: 1;
+        margin: 5rem 2rem 1rem 1rem;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5); /* Increased shadow for depth */
+        border-radius: 10px; /* Optional: Adds rounded corners to enhance the "windowed" look */
+      }
+
+      .sidePanel {
+        width: 385px; /* Fixed width */
+        padding: 20px 15px;
+        background-color: rgba(
+          255,
+          255,
+          255,
+          0.95
+        ); /* Slightly transparent white */
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        border-radius: 10px; /* Consistent border-radius */
+        border-left: none;
+        display: flex;
+        flex-direction: column;
+        margin-top: 2rem;
+        height: 90.5%;
+      }
+
+      #northPalmSpringsOrders,
+      #southPalmSpringsOrders {
+        margin: 0 10px 3px 10px;
+      }
+
+      .order-address {
+        display: flex;
+        align-items: right;
+        padding: 12px;
+      }
+
+      .input-suggestions-container {
+        flex-grow: 1; /* Allow the container to take up available space */
+        position: relative;
+      }
+      .order-address calcite-input {
+        flex: 1;
+      }
+
+      .suggestions {
+        list-style-type: none; /* Remove bullets */
+        padding: 0;
+        margin-top: 2px;
+        position: absolute;
+        top: 100%; /* Position the suggestions right below the input field */
+        left: 0;
+        right: 17px; /* Ensures the dropdown matches the input width */
+        background-color: #ffffff;
+        border: 1px solid #d1d5db; /* Light gray border */
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* Subtle shadow for depth */
+        z-index: 5; /* Ensure the list is above other content */
+        max-height: 300px; /* Limit height of suggestions box */
+        overflow-y: auto; /* Enable scroll if too many suggestions */
+        border-radius: 4px; /* Rounded corners for a softer look */
+      }
+      .suggestion {
+        padding: 10px;
+        cursor: pointer;
+      }
+      .suggestion:hover {
+        background-color: #f9f9f9;
+      }
+      .orders-title {
+        font-size: 2rem;
+        font-weight: bold;
+        margin-bottom: 3px;
+        text-align: center;
+      }
+      .app-title {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        font-weight: 700;
+        background-color: #007ac2;
+        color: #ffffff;
+        text-align: center;
+        font-family: 'Raleway', 'Montserrat', 'Avenir Next', 'Helvetica Neue';
+        padding: 2px 0;
+        font-size: 2rem;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        z-index: 2;
+      }
+      .custom-calcite-button {
+        background-color: #007ac2; /* Calcite blue */
+        color: white;
+        border: none;
+        padding: 0px 12px; /* Adjust padding to match the calcite-input height */
+        font-size: 15px; /* Match the font size of calcite components */
+        cursor: pointer;
+        border-radius: 4px; /* Rounded corners like Calcite buttons */
+        font-family: 'Raleway', 'Montserrat', 'Avenir Next', 'Helvetica Neue';
+        transition: background-color 0.3s ease; /* Smooth transition for hover effect */
+        font-family: 'Raleway', 'Montserrat', 'Avenir Next', 'Helvetica Neue',
+          sans-serif;
+      }
+      .custom-input {
+        font-family: 'Raleway', 'Montserrat', 'Avenir Next', 'Helvetica Neue',
+          sans-serif;
+        padding: 8px 12px;
+        font-size: 15px;
+        border: 1px solid #d1d5db;
+        border-radius: 4px;
+        outline: none;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        width: 12.5rem;
+        transition: border-color 0.3s, box-shadow 0.3s; /* Smooth transitions for interactions */
+      }
+
+      .custom-input:focus {
+        border-color: #4d90fe; /* Focus border color, similar to Calcite's focus state */
+        box-shadow: 0 0 0 3px rgba(77, 144, 254, 0.5); /* Focus shadow for accessibility */
+      }
+      .orders-small-title {
+        font-size: 1.45rem; /* Adjusted font size */
+        font-weight: bold;
+      }
+
+      .custom-calcite-button:hover {
+        background-color: #005c99; /* Darker shade of blue on hover */
+      }
+
+      .custom-calcite-button:active {
+        background-color: #004d80; /* Even darker shade on active */
+      }
+
+      .custom-calcite-button:focus {
+        outline: 2px solid #005c99; /* Focus outline similar to Calcite's focus state */
+        outline-offset: 2px;
+      }
+
+      .small-calcite-button {
+        background-color: #007ac2;
+        color: white;
+        border: none;
+        padding: 4px 7px;
+        font-size: 13px;
+        cursor: pointer;
+        border-radius: 3px;
+        font-family: 'Raleway', 'Montserrat', 'Avenir Next', 'Helvetica Neue',
+          sans-serif;
+        transition: background-color 0.3s ease; /* Smooth transition for hover effect */
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 5px;
+      }
+
+      .small-calcite-button:hover {
+        background-color: #005c99; /* Darker shade of blue on hover */
+      }
+
+      .small-calcite-button:active {
+        background-color: #004d80; /* Even darker shade on active */
+      }
+
+      .small-calcite-button:focus {
+        outline: 2px solid #005c99; /* Focus outline */
+        outline-offset: 2px;
+      }
+
+      .small-calcite-button {
+        --calcite-button-width: auto; /* Adjust button width automatically */
+      }
+
+      #northFacilityUl,
+      #southFacilityUl {
+        list-style-type: none; /* Remove bullets */
+        margin-left: -2.8rem;
+        line-height: 0.65rem;
+      }
+
+      #northFacilityUl li,
+      #southFacilityUl li {
+        padding: 7px 3px;
+        border-bottom: 1px solid #eee;
+        font-size: 12.5px;
+      }
+
+      #northFacilityUl li:last-child,
+      #southFacilityUl li:last-child {
+        border-bottom: none; /* Remove border from the last list item */
+      }
+
+      .calcite-shell {
+        display: flex;
+        flex-direction: column;
+        height: 100vh; /* Ensure shell fills the viewport height */
+      }
+
+      .facility-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0px;
+        border-radius: 5px; /* Rounded corners for the header */
+      }
+
+      .facility-container {
+        border: 1px solid #ddd; /* Border around the facility container */
+        border-radius: 15px; /* Rounded corners for the container */
+        padding: 15px;
+      }
+
+      .orders-title,
+      .orders-small-title {
+        font-family: 'Montserrat', sans-serif; /* More readable for headings */
+        color: #333; /* Darker color for better readability */
+        color: #007ac2; /* More vibrant color for titles */
+      }
+      .custom-calcite-button:hover,
+      .small-calcite-button:hover {
+        background-color: #005c99; /* Subtle change on hover */
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2); /* Slightly more pronounced shadow */
+      }
+      .order-address,
+      .facility-header {
+        font-size: 0.95rem; /* Slightly smaller font size for less critical information */
+      }
+
+      .custom-calcite-button,
+      .small-calcite-button {
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Subtle shadow for depth */
+        transition: all 0.3s ease; /* Smooth transition for hover and focus */
+      }
+      .custom-calcite-button:focus,
+      .small-calcite-button:focus {
+        outline: 2px solid #005c99; /* Clearer focus state */
+      }
+
+      /* Enhancements for inputs and suggestions */
+      .custom-input,
+      .suggestions {
+        border-radius: 6px; /* Smoother corners */
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Subtle shadow for depth */
+      }
+
+      .custom-input:focus {
+        border-color: #007ac2; /* Focus color to match buttons */
+        box-shadow: 0 0 5px rgba(0, 122, 194, 0.5); /* Glow effect for focus */
+      }
+
+      #customButtonContainer {
+        position: absolute;
+        bottom: 20px;
+        left: 20px;
+        z-index: 10;
+      }
+
+      #customButtonContainer {
+        position: absolute;
+        bottom: 40px;
+        left: 40px;
+        z-index: 10;
+        display: flex; /* Use flexbox to arrange children horizontally */
+        gap: 10px; /* Optional: adds some space between the buttons */
+      }
+
+      .map-button {
+        padding: 6px 8px;
+        background-color: white;
+        color: black;
+        border: none;
+        font-size: 10.5px;
+        cursor: pointer;
+        border-radius: 4px;
+        font-family: 'Raleway', 'Montserrat', 'Avenir Next', 'Helvetica Neue',
+          sans-serif;
+        /* No change needed here, just included for context */
+      }
+
+      .map-button:hover {
+        background-color: lightblue;
+      }
+
+      .modal-overlay {
+        position: fixed;
+        z-index: 11;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        overflow: auto;
+        background-color: rgb(0, 0, 0, 0.4);
+      }
+
+      .modal-content {
+        background-color: #fefefe;
+        margin: 5% auto;
+        padding: 20px;
+        border: 1px solid #888;
+        width: 50%;
+        border-radius: 5px;
+        font-size: 15px;
+      }
+
+      .close-modal {
+        color: #aaa;
+        float: right;
+        font-size: 28px;
+        font-weight: bold;
+      }
+
+      .close-modal:hover,
+      .close-modal:focus {
+        color: black;
+        text-decoration: none;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <calcite-shell>
+      <calcite-header slot="header">
+        <div class="app-title">
+          <img
+            src="./grocery-image-removebg-preview.png"
+            alt="FreshWheel Groceries"
+            style="height: 50px; vertical-align: middle; margin-right: 20px"
+          />
+          <!-- Set the path to where your icon file is stored -->
+          FreshWheel Groceries
+          <img
+            src="./grocery-image-removebg-preview.png"
+            alt="FreshWheel Groceries"
+            style="height: 55px; vertical-align: middle; margin-left: 20px"
+          />
+        </div>
+      </calcite-header>
+      <div class="content-container">
+        <div id="map" class="map-window"></div>
+        <div id="addressesList" class="sidePanel">
+          <div class="orders-title">Grocery Orders</div>
+          <!-- For Add Order Button (already updated) -->
+          <div class="order-address search-bar search">
+            <div class="input-suggestions-container">
+              <input
+                id="orderAddress"
+                placeholder="Enter order address"
+                type="text"
+                scale="l"
+                class="custom-input"
+              />
+              <ul
+                id="suggestions"
+                class="suggestions"
+                style="display: none"
+              ></ul>
+            </div>
+            <button id="addOrderButton" class="custom-calcite-button">
+              Add an Order
+            </button>
+          </div>
+          <!-- For North Palm Springs Facility -->
+          <div id="northPalmSpringsOrders" class="facility-container">
+            <div class="facility-header">
+              <span class="orders-small-title">North Facility</span>
+              <button class="small-calcite-button" id="northFacilityButton">
+                Service Areas
+                <calcite-icon icon="mask-inside" scale="m"></calcite-icon>
+              </button>
+            </div>
+            <ul id="northFacilityUl"></ul>
+          </div>
+
+          <!-- For South Palm Springs Facility -->
+          <div id="southPalmSpringsOrders" class="facility-container">
+            <div class="facility-header">
+              <span class="orders-small-title">South Facility</span>
+              <button class="small-calcite-button" id="southFacilityButton">
+                Service Areas
+                <calcite-icon icon="mask-inside" scale="m"></calcite-icon>
+              </button>
+            </div>
+            <ul id="southFacilityUl"></ul>
+          </div>
+        </div>
+      </div>
+    </calcite-shell>
+    <div id="customButtonContainer">
+      <button id="buttonOne" class="map-button">Closest Facility</button>
+      <button id="buttonTwo" class="map-button">Optimized Route</button>
+      <button id="buttonThree" class="map-button">Service Area</button>
+    </div>
+    <!-- Modal Overlay Structure -->
+    <div id="modalOverlay" class="modal-overlay" style="display: none">
+      <div class="modal-content">
+        <span class="close-modal">&times;</span>
+        <pre id="codeSnippet"></pre>
+      </div>
+    </div>
+
+    <script>
+      const apiKey =
+        'YOUR_KEY'
+      const basemapEnum = 'arcgis/community'
+      const authentication = arcgisRest.ApiKeyManager.fromKey(apiKey)
+
+      const map = new maplibregl.Map({
+        container: 'map',
+        style: `https://basemapstyles-api.arcgis.com/arcgis/rest/services/styles/v2/styles/${basemapEnum}?token=${apiKey}`,
+        zoom: 12,
+        center: [-116.5253, 33.8303]
+      })
+
+      const facilities = [
+        {
+          id: 1,
+          longitude: -116.5466,
+          latitude: 33.8502,
+          name: 'North Palm Springs Facility'
+        },
+        {
+          id: 2,
+          longitude: -116.528,
+          latitude: 33.8014,
+          name: 'South Palm Springs Facility'
+        }
+      ]
+
+      async function calculateRouteBetweenStops() {
+        try {
+          const routeParams = {
+            preserveFirstStop: [-116.528, 33.8014],
+            stops: geocodedAddressesList,
+            returnDirections: true,
+            returnStops: true,
+            startTime: 'now',
+            findBestSequence: true, //optimized route
+            authentication: arcgisRest.ApiKeyManager.fromKey(apiKey)
+          }
+
+          const response = await arcgisRest.solveRoute(routeParams)
+
+          console.log(response)
+
+          if (response.routes.features.length > 0) {
+            const route = response.routes.features[0]
+            displayRouteOnMap(route.geometry, '#006400')
+          } else {
+            console.error('No route found')
+          }
+        } catch (error) {
+          console.error('Failed to calculate route', error)
+        }
+      }
+
+      async function calculateRouteBetweenStops2() {
+        try {
+          const routeParams = {
+            preserveFirstStop: [-116.5466, 33.8502],
+            stops: geocodedAddressesList2,
+            returnDirections: true,
+            returnStops: true,
+            startTime: 'now',
+            findBestSequence: true,
+            authentication: arcgisRest.ApiKeyManager.fromKey(apiKey)
+          }
+
+          const response = await arcgisRest.solveRoute(routeParams)
+          console.log(response)
+
+          if (response.routes.features.length > 0) {
+            const route = response.routes.features[0]
+            displayRouteOnMap2(route.geometry, '#7B68EE')
+          } else {
+            console.error('No route found')
+          }
+        } catch (error) {
+          console.error('Failed to calculate route', error)
+        }
+      }
+
+      function displayRouteOnMap(routeGeometry, color) {
+        // Check if the route layer already exists, remove it if it does
+        if (map.getLayer('route')) {
+          map.removeLayer('route')
+          map.removeSource('route')
+        }
+
+        // Create a GeoJSON object for the entire route
+        const geoJsonFeatureCollection = {
+          type: 'FeatureCollection',
+          features: [] // This will hold all the line segments
+        }
+
+        // Check if routeGeometry.paths is available and it's an array of arrays
+        if (routeGeometry.paths && routeGeometry.paths.length > 0) {
+          // Iterate over all paths
+          routeGeometry.paths.forEach((path, index) => {
+            // Create a GeoJSON Feature for each path
+            const geoJsonFeature = {
+              type: 'Feature',
+              properties: {
+                id: index // Assign an ID or any other property you find useful
+              },
+              geometry: {
+                type: 'LineString',
+                coordinates: path.map(([x, y]) => [x, y]) // Convert path to GeoJSON coordinates
+              }
+            }
+
+            // Add the feature to the feature collection
+            geoJsonFeatureCollection.features.push(geoJsonFeature)
+          })
+        } else {
+          console.error(
+            'Invalid route geometry or route geometry format not recognized.'
+          )
+          return
+        }
+
+        // Add the feature collection as a source to the map
+        map.addSource('route', {
+          type: 'geojson',
+          data: geoJsonFeatureCollection
+        })
+
+        // Add a layer to display the route
+        map.addLayer({
+          id: 'route',
+          type: 'line',
+          source: 'route',
+          layout: {
+            'line-join': 'round',
+            'line-cap': 'round'
+          },
+          paint: {
+            'line-color': color, // Use a bright color to highlight the route
+            'line-width': 5
+          }
+        })
+      }
+
+      function displayRouteOnMap2(routeGeometry, color) {
+        // Check if the route layer already exists, remove it if it does
+        if (map.getLayer('route2')) {
+          map.removeLayer('route2')
+          map.removeSource('route2')
+        }
+
+        // Create a GeoJSON object for the entire route
+        const geoJsonFeatureCollection = {
+          type: 'FeatureCollection',
+          features: [] // This will hold all the line segments
+        }
+
+        // Check if routeGeometry.paths is available and it's an array of arrays
+        if (routeGeometry.paths && routeGeometry.paths.length > 0) {
+          // Iterate over all paths
+          routeGeometry.paths.forEach((path, index) => {
+            // Create a GeoJSON Feature for each path
+            const geoJsonFeature = {
+              type: 'Feature',
+              properties: {
+                id: index // Assign an ID or any other property you find useful
+              },
+              geometry: {
+                type: 'LineString',
+                coordinates: path.map(([x, y]) => [x, y]) // Convert path to GeoJSON coordinates
+              }
+            }
+
+            // Add the feature to the feature collection
+            geoJsonFeatureCollection.features.push(geoJsonFeature)
+          })
+        } else {
+          console.error(
+            'Invalid route geometry or route geometry format not recognized.'
+          )
+          return
+        }
+
+        // Add the feature collection as a source to the map
+        map.addSource('route2', {
+          type: 'geojson',
+          data: geoJsonFeatureCollection
+        })
+
+        // Add a layer to display the route
+        map.addLayer({
+          id: 'route2',
+          type: 'line',
+          source: 'route2',
+          layout: {
+            'line-join': 'round',
+            'line-cap': 'round'
+          },
+          paint: {
+            'line-color': color, // Use a bright color to highlight the route
+            'line-width': 5
+          }
+        })
+      }
+
+      document.addEventListener('DOMContentLoaded', () => {
+        calculateRouteBetweenStops()
+        calculateRouteBetweenStops2()
+      })
+
+      const addresses = [
+        '1234 N Palm Canyon Dr, Palm Springs, CA',
+        '5678 W Racquet Club Rd, Palm Springs, CA',
+        '9012 N Via Miraleste, Palm Springs, CA',
+        '3456 N Avenida Caballeros, Palm Springs, CA',
+        '7890 E Tachevah Dr, Palm Springs, CA',
+        '1213 N Sunrise Way, Palm Springs, CA',
+        '4567 E Palm Canyon Dr, Palm Springs, CA',
+        '8910 S Calle Palo Fierro, Palm Springs, CA',
+        '2345 S Camino Real, Palm Springs, CA',
+        '6789 E Mesquite Ave, Palm Springs, CA'
+      ]
+
+      const geocodedAddressesList = [
+        [-116.546701, 33.83977998],
+        [-116.54122359, 33.843074853847],
+        [-116.536684634219, 33.850342852482],
+        [-116.5466, 33.8502],
+        [-116.55347515, 33.85216355582],
+        [-116.507055041181, 33.837669440729],
+        [-116.528258981141, 33.839496075423]
+      ]
+
+      const geocodedAddressesList2 = [
+        [-116.496645396068, 33.793630479324],
+        [-116.528, 33.8014],
+        [-116.541268730663, 33.81337998507],
+        [-116.538680821252, 33.789458486642],
+        [-116.492856272957, 33.808600483848]
+      ]
+
+      map.on('load', async () => {
+        addStartingPointLayer()
+        facilities.forEach(facility => addFacilityToMap(facility))
+
+        // Geocode all addresses first
+        let geocodedAddresses = await Promise.all(
+          addresses.map(async address => {
+            const response = await arcgisRest.geocode({
+              address: address,
+              countryCode: 'USA',
+              authentication
+            })
+            if (response.candidates.length > 0) {
+              const { location } = response.candidates[0]
+              return { address, location }
+            }
+          })
+        )
+
+        // Filter out undefined results due to failed geocoding
+        geocodedAddresses = geocodedAddresses.filter(a => a !== undefined)
+
+        // Determine closest facility for each geocoded address
+        await Promise.all(
+          geocodedAddresses.map(async geocodedAddress => {
+            const { location } = geocodedAddress
+            const incidentsFormatted = [[location.x, location.y]]
+
+            const response = await arcgisRest.closestFacility({
+              incidents: incidentsFormatted,
+              facilities: facilities.map(f => [f.longitude, f.latitude]),
+              returnCFRoutes: true,
+              authentication: authentication
+            })
+
+            if (response.routes.features.length > 0) {
+              const closestFacilityRoute = response.routes.features[0]
+              const facilityId = closestFacilityRoute.attributes.FacilityID
+              const facility = facilities.find(f => f.id === facilityId)
+              addOrderToMap({ ...geocodedAddress, facilityName: facility.name })
+            }
+          })
+        )
+      })
+
+      const searchIcon = document.getElementById('addOrderButton')
+      const geocodeInput = document.getElementById('orderAddress')
+      const suggestionsList = document.getElementById('suggestions')
+
+      searchIcon.addEventListener('click', () => {
+        // Show/hide search input on search icon click
+        geocodeInput.style.display = 'block'
+        geocodeInput.classList.add('expanded')
+      })
+
+      geocodeInput.addEventListener('input', event => {
+        const query = event.target.value
+        if (query.length < 1) {
+          suggestionsList.style.display = 'none'
+          return
+        }
+
+        // Fetch suggestions using ArcGIS REST API
+        arcgisRest
+          .suggest(query, {
+            authentication: arcgisRest.ApiKeyManager.fromKey(apiKey)
+          })
+          .then(response => {
+            suggestionsList.innerHTML = ''
+            suggestionsList.style.display = 'block'
+
+            response.suggestions.forEach(suggestion => {
+              const listItem = document.createElement('li')
+              listItem.classList.add('suggestion')
+              listItem.textContent = suggestion.text
+              listItem.onclick = () => handleSuggestionClick(suggestion.text) // Define handleSuggestionClick function
+              suggestionsList.appendChild(listItem)
+            })
+          })
+          .catch(error => {
+            console.error('Error fetching suggestions:', error)
+          })
+      })
+
+      function handleSuggestionClick(suggestionText) {
+        // Set the value of the input field to the selected suggestion
+        document.getElementById('orderAddress').value = suggestionText
+        // Hide the suggestions list
+        document.getElementById('suggestions').style.display = 'none'
+      }
+
+      function addFacilityToMap(facility) {
+        // Create a new marker with the customized element
+        new maplibregl.Marker({ color: 'red' })
+          .setLngLat([facility.longitude, facility.latitude])
+          .setPopup(
+            new maplibregl.Popup({ offset: 25 }) // add popups
+              .setHTML(
+                `<h3>${facility.name}</h3><p>Facility ID: ${facility.id}</p>`
+              )
+          )
+          .addTo(map)
+      }
+
+      function addServiceAreaForFacility(facilityId) {
+        const facility = facilities.find(f => f.id === facilityId)
+        const coordinates = [facility.longitude, facility.latitude]
+
+        const authentication = arcgisRest.ApiKeyManager.fromKey(apiKey)
+
+        arcgisRest
+          .serviceArea({
+            authentication,
+            facilities: [coordinates]
+          })
+          .then(response => {
+            // Add service area source and layer if not already added
+            if (!map.getSource('servicearea')) {
+              map.addSource('servicearea', {
+                type: 'geojson',
+                data: response.saPolygons.geoJson
+              })
+
+              map.addLayer({
+                id: 'servicearea-fill',
+                type: 'fill',
+                source: 'servicearea',
+                paint: {
+                  'fill-color': [
+                    'match',
+                    ['get', 'FromBreak'],
+                    0,
+                    'hsl(165, 80%, 40%)',
+                    5,
+                    'hsl(16, 80%, 60%)',
+                    'transparent'
+                  ],
+                  'fill-outline-color': 'black',
+                  'fill-opacity': [
+                    'step',
+                    ['get', 'FromBreak'],
+                    0.8, // More opaque
+                    5,
+                    0.65, // Medium opacity
+                  ]
+                }
+              })
+            } else {
+              // Update service area data if source already exists
+              map.getSource('servicearea').setData(response.saPolygons.geoJson)
+            }
+          })
+          .catch(error => {
+            console.error('Error adding service area:', error)
+          })
+      }
+
+      // Event listener for North Palm Springs Facility button
+      document
+        .getElementById('northFacilityButton')
+        .addEventListener('click', function () {
+          addServiceAreaForFacility(1) // Assuming Facility ID 1 is for North Palm Springs Facility
+        })
+
+      // Event listener for South Palm Springs Facility button
+      document
+        .getElementById('southFacilityButton')
+        .addEventListener('click', function () {
+          addServiceAreaForFacility(2) // Assuming Facility ID 2 is for South Palm Springs Facility
+        })
+
+      function addStartingPointLayer() {
+        if (!map.getSource('start')) {
+          map.addSource('start', {
+            type: 'geojson',
+            data: {
+              type: 'FeatureCollection',
+              features: []
+            }
+          })
+
+          map.addLayer({
+            id: 'start-circle',
+            type: 'circle',
+            source: 'start',
+            paint: {
+              'circle-radius': 6,
+              'circle-color': 'white',
+              'circle-stroke-color': 'black',
+              'circle-stroke-width': 2
+            }
+          })
+        }
+      }
+      map.on('load', async function () {
+        addStartingPointLayer()
+      })
+
+      function addOrderToMap(order) {
+        // Create a new marker element
+        const el = document.createElement('div')
+        el.className = 'order-marker'
+        el.style.backgroundImage = 'url(https://example.com/order-icon.png)'
+        el.style.width = '24px'
+        el.style.height = '24px'
+        el.style.backgroundSize = '100%'
+        el.style.borderRadius = '50%'
+
+        // Add the marker to the map
+        new maplibregl.Marker(el)
+          .setLngLat([order.location.x, order.location.y])
+          .setPopup(
+            new maplibregl.Popup({ offset: 25 }).setHTML(
+              `<h3>Order Location</h3><p>Address: ${order.address}</p><p>Served by: ${order.facilityName}</p>`
+            )
+          )
+          .addTo(map)
+
+        // Update the HTML list under the correct facility
+        const ulId =
+          order.facilityName === 'North Palm Springs Facility'
+            ? 'northFacilityUl'
+            : 'southFacilityUl'
+        const ul = document.getElementById(ulId)
+        const li = document.createElement('li')
+        li.textContent = order.address
+        ul.appendChild(li)
+      }
+
+      document
+        .getElementById('addOrderButton')
+        .addEventListener('click', function () {
+          const address = document.getElementById('orderAddress').value
+          processOrder(address)
+          document.getElementById('orderAddress').value = '' // Clear the input field
+        })
+
+      async function processOrder(address) {
+        try {
+          const response = await arcgisRest.geocode({
+            address: address,
+            countryCode: 'USA',
+            authentication: authentication
+          })
+
+          if (response.candidates && response.candidates.length > 0) {
+            const location = response.candidates[0].location
+            const newStop = [location.x, location.y]
+
+            // Determine the closest facility to the new order
+            const closestFacility = await findClosestFacility(
+              location,
+              facilities
+            )
+
+            if (closestFacility) {
+              const order = {
+                address: address,
+                location: location,
+                facilityName: closestFacility.name
+              }
+
+              // Add the new order to the appropriate list based on closest facility
+              if (closestFacility.id === 1) {
+                geocodedAddressesList.push(newStop)
+                await calculateRouteBetweenStops() // Recalculate with the updated list
+              } else if (closestFacility.id === 2) {
+                geocodedAddressesList2.push(newStop)
+                await calculateRouteBetweenStops2() // Recalculate with the updated list
+              }
+
+              // Add order pin to the map and update the list UI
+              addOrderToMap(order)
+            } else {
+              console.error(
+                'Could not determine closest facility for:',
+                address
+              )
+            }
+          } else {
+            console.error('No candidates found for address:', address)
+          }
+        } catch (error) {
+          console.error('Error processing order address:', error)
+        }
+      }
+
+      // Assuming findClosestFacility function exists and determines the closest facility
+      // based on the passed location and the facilities array. It should return the facility object.
+
+      async function findClosestFacility(incident, facilities) {
+        // Convert the facilities and incident to the format expected by the ArcGIS REST JS API
+        const facilitiesFormatted = facilities.map(facility => ({
+          longitude: facility.longitude,
+          latitude: facility.latitude
+        }))
+        const incidentsFormatted = [
+          {
+            longitude: incident.x,
+            latitude: incident.y
+          }
+        ]
+
+        try {
+          const response = await arcgisRest.closestFacility({
+            incidents: incidentsFormatted,
+            facilities: facilitiesFormatted,
+            returnCFRoutes: true, // Set to true if you want the route details
+            authentication: authentication
+          })
+
+          if (response.routes && response.routes.features.length > 0) {
+            const closestFacilityRoute = response.routes.features[0] // Assuming the first route is the closest
+            // Return the closest facility based on its ID
+            return facilities.find(
+              facility =>
+                facility.id === closestFacilityRoute.attributes.FacilityID
+            )
+          } else {
+            console.error('No routes found for:', incident)
+            return null
+          }
+        } catch (error) {
+          console.error('Error finding closest facility:', error)
+          return null
+        }
+      }
+
+      // Function to open modal with specific code snippet
+      function openModal(codeSnippetText) {
+        document.getElementById('modalOverlay').style.display = 'block'
+        document.getElementById('codeSnippet').textContent = codeSnippetText
+      }
+
+      // Function to close modal
+      document
+        .getElementsByClassName('close-modal')[0]
+        .addEventListener('click', function () {
+          document.getElementById('modalOverlay').style.display = 'none'
+        })
+
+      // Button click event listeners
+      document.getElementById('buttonOne').addEventListener('click', () => {
+        const codeSnippetOne = `
+        const response = await arcgisRest.closestFacility({
+          incidents: theOrders,
+          facilities: distributionCenters,
+          returnCFRoutes: true,
+          authentication
+        })`
+        openModal(codeSnippetOne)
+      })
+
+      document.getElementById('buttonTwo').addEventListener('click', () => {
+        const codeSnippetTwo = `
+          const response = await arcgisRest.solveRoute({
+            preserveFirstStop: [-116.528, 33.8014],
+            stops: addressOrders,
+            returnDirections: true,
+            returnStops: true,
+            findBestSequence: true, //optimized route
+            authentication
+          })`
+        openModal(codeSnippetTwo)
+      })
+
+      document.getElementById('buttonThree').addEventListener('click', () => {
+        const codeSnippetThree = `
+        arcgisRest
+          .serviceArea({
+            authentication,
+            facilities: [distributionCenter]
+          }).then(response => {
+          map.addSource('servicearea', {
+            type: 'geojson',
+            data: response.saPolygons.geoJson
+          })
+          map.addLayer({
+            id: 'servicearea-fill',
+            type: 'fill',
+            source: 'servicearea',
+            paint: {
+              'fill-color': [
+                'match',
+                ['get', 'FromBreak'],
+                0,
+                'hsl(165, 80%, 40%)',
+                5,
+                'hsl(16, 80%, 60%)',
+                'transparent'
+              ],
+              'fill-outline-color': 'black',
+              'fill-opacity': [
+                'step',
+                ['get', 'FromBreak'],
+                0.8, // More opaque
+                5,
+                0.65, // Medium opacity
+              ]
+            }
+          })`
+        openModal(codeSnippetThree)
+      })
+
+      // Close modal if clicked outside of it
+      window.onclick = function (event) {
+        if (event.target == document.getElementById('modalOverlay')) {
+          document.getElementById('modalOverlay').style.display = 'none'
+        }
+      }
+    </script>
+  </body>
+</html>
